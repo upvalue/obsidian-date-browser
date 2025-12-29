@@ -1,7 +1,12 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -14,7 +19,295 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// node_modules/clusterize.js/clusterize.js
+var require_clusterize = __commonJS({
+  "node_modules/clusterize.js/clusterize.js"(exports, module2) {
+    (function(name, definition) {
+      if (typeof module2 != "undefined")
+        module2.exports = definition();
+      else if (typeof define == "function" && typeof define.amd == "object")
+        define(definition);
+      else
+        this[name] = definition();
+    })("Clusterize", function() {
+      "use strict";
+      var ie = function() {
+        for (var v = 3, el = document.createElement("b"), all = el.all || []; el.innerHTML = "<!--[if gt IE " + ++v + "]><i><![endif]-->", all[0]; ) {
+        }
+        return v > 4 ? v : document.documentMode;
+      }(), is_mac = navigator.platform.toLowerCase().indexOf("mac") + 1;
+      var Clusterize2 = function(data) {
+        if (!(this instanceof Clusterize2))
+          return new Clusterize2(data);
+        var self = this;
+        var defaults = {
+          rows_in_block: 50,
+          blocks_in_cluster: 4,
+          tag: null,
+          show_no_data_row: true,
+          no_data_class: "clusterize-no-data",
+          no_data_text: "No data",
+          keep_parity: true,
+          callbacks: {}
+        };
+        self.options = {};
+        var options = ["rows_in_block", "blocks_in_cluster", "show_no_data_row", "no_data_class", "no_data_text", "keep_parity", "tag", "callbacks"];
+        for (var i = 0, option; option = options[i]; i++) {
+          self.options[option] = typeof data[option] != "undefined" && data[option] != null ? data[option] : defaults[option];
+        }
+        var elems = ["scroll", "content"];
+        for (var i = 0, elem; elem = elems[i]; i++) {
+          self[elem + "_elem"] = data[elem + "Id"] ? document.getElementById(data[elem + "Id"]) : data[elem + "Elem"];
+          if (!self[elem + "_elem"])
+            throw new Error("Error! Could not find " + elem + " element");
+        }
+        if (!self.content_elem.hasAttribute("tabindex"))
+          self.content_elem.setAttribute("tabindex", 0);
+        var rows = isArray(data.rows) ? data.rows : self.fetchMarkup(), cache = {}, scroll_top = self.scroll_elem.scrollTop;
+        self.insertToDOM(rows, cache);
+        self.scroll_elem.scrollTop = scroll_top;
+        var last_cluster = false, scroll_debounce = 0, pointer_events_set = false, scrollEv = function() {
+          if (is_mac) {
+            if (!pointer_events_set)
+              self.content_elem.style.pointerEvents = "none";
+            pointer_events_set = true;
+            clearTimeout(scroll_debounce);
+            scroll_debounce = setTimeout(function() {
+              self.content_elem.style.pointerEvents = "auto";
+              pointer_events_set = false;
+            }, 50);
+          }
+          if (last_cluster != (last_cluster = self.getClusterNum(rows)))
+            self.insertToDOM(rows, cache);
+          if (self.options.callbacks.scrollingProgress)
+            self.options.callbacks.scrollingProgress(self.getScrollProgress());
+        }, resize_debounce = 0, resizeEv = function() {
+          clearTimeout(resize_debounce);
+          resize_debounce = setTimeout(self.refresh, 100);
+        };
+        on("scroll", self.scroll_elem, scrollEv);
+        on("resize", window, resizeEv);
+        self.destroy = function(clean) {
+          off("scroll", self.scroll_elem, scrollEv);
+          off("resize", window, resizeEv);
+          self.html((clean ? self.generateEmptyRow() : rows).join(""));
+        };
+        self.refresh = function(force) {
+          if (self.getRowsHeight(rows) || force)
+            self.update(rows);
+        };
+        self.update = function(new_rows) {
+          rows = isArray(new_rows) ? new_rows : [];
+          var scroll_top2 = self.scroll_elem.scrollTop;
+          if (rows.length * self.options.item_height < scroll_top2) {
+            self.scroll_elem.scrollTop = 0;
+            last_cluster = 0;
+          }
+          self.insertToDOM(rows, cache);
+          self.scroll_elem.scrollTop = scroll_top2;
+        };
+        self.clear = function() {
+          self.update([]);
+        };
+        self.getRowsAmount = function() {
+          return rows.length;
+        };
+        self.getScrollProgress = function() {
+          return this.options.scroll_top / (rows.length * this.options.item_height) * 100 || 0;
+        };
+        var add = function(where, _new_rows) {
+          var new_rows = isArray(_new_rows) ? _new_rows : [];
+          if (!new_rows.length)
+            return;
+          rows = where == "append" ? rows.concat(new_rows) : new_rows.concat(rows);
+          self.insertToDOM(rows, cache);
+        };
+        self.append = function(rows2) {
+          add("append", rows2);
+        };
+        self.prepend = function(rows2) {
+          add("prepend", rows2);
+        };
+      };
+      Clusterize2.prototype = {
+        constructor: Clusterize2,
+        // fetch existing markup
+        fetchMarkup: function() {
+          var rows = [], rows_nodes = this.getChildNodes(this.content_elem);
+          while (rows_nodes.length) {
+            rows.push(rows_nodes.shift().outerHTML);
+          }
+          return rows;
+        },
+        // get tag name, content tag name, tag height, calc cluster height
+        exploreEnvironment: function(rows, cache) {
+          var opts = this.options;
+          opts.content_tag = this.content_elem.tagName.toLowerCase();
+          if (!rows.length)
+            return;
+          if (ie && ie <= 9 && !opts.tag)
+            opts.tag = rows[0].match(/<([^>\s/]*)/)[1].toLowerCase();
+          if (this.content_elem.children.length <= 1)
+            cache.data = this.html(rows[0] + rows[0] + rows[0]);
+          if (!opts.tag)
+            opts.tag = this.content_elem.children[0].tagName.toLowerCase();
+          this.getRowsHeight(rows);
+        },
+        getRowsHeight: function(rows) {
+          var opts = this.options, prev_item_height = opts.item_height;
+          opts.cluster_height = 0;
+          if (!rows.length)
+            return;
+          var nodes = this.content_elem.children;
+          if (!nodes.length)
+            return;
+          var node = nodes[Math.floor(nodes.length / 2)];
+          opts.item_height = node.offsetHeight;
+          if (opts.tag == "tr" && getStyle("borderCollapse", this.content_elem) != "collapse")
+            opts.item_height += parseInt(getStyle("borderSpacing", this.content_elem), 10) || 0;
+          if (opts.tag != "tr") {
+            var marginTop = parseInt(getStyle("marginTop", node), 10) || 0;
+            var marginBottom = parseInt(getStyle("marginBottom", node), 10) || 0;
+            opts.item_height += Math.max(marginTop, marginBottom);
+          }
+          opts.block_height = opts.item_height * opts.rows_in_block;
+          opts.rows_in_cluster = opts.blocks_in_cluster * opts.rows_in_block;
+          opts.cluster_height = opts.blocks_in_cluster * opts.block_height;
+          return prev_item_height != opts.item_height;
+        },
+        // get current cluster number
+        getClusterNum: function(rows) {
+          var opts = this.options;
+          opts.scroll_top = this.scroll_elem.scrollTop;
+          var cluster_divider = opts.cluster_height - opts.block_height;
+          var current_cluster = Math.floor(opts.scroll_top / cluster_divider);
+          var max_cluster = Math.floor(rows.length * opts.item_height / cluster_divider);
+          return Math.min(current_cluster, max_cluster);
+        },
+        // generate empty row if no data provided
+        generateEmptyRow: function() {
+          var opts = this.options;
+          if (!opts.tag || !opts.show_no_data_row)
+            return [];
+          var empty_row = document.createElement(opts.tag), no_data_content = document.createTextNode(opts.no_data_text), td;
+          empty_row.className = opts.no_data_class;
+          if (opts.tag == "tr") {
+            td = document.createElement("td");
+            td.colSpan = 100;
+            td.appendChild(no_data_content);
+          }
+          empty_row.appendChild(td || no_data_content);
+          return [empty_row.outerHTML];
+        },
+        // generate cluster for current scroll position
+        generate: function(rows) {
+          var opts = this.options, rows_len = rows.length;
+          if (rows_len < opts.rows_in_block) {
+            return {
+              top_offset: 0,
+              bottom_offset: 0,
+              rows_above: 0,
+              rows: rows_len ? rows : this.generateEmptyRow()
+            };
+          }
+          var items_start = Math.max((opts.rows_in_cluster - opts.rows_in_block) * this.getClusterNum(rows), 0), items_end = items_start + opts.rows_in_cluster, top_offset = Math.max(items_start * opts.item_height, 0), bottom_offset = Math.max((rows_len - items_end) * opts.item_height, 0), this_cluster_rows = [], rows_above = items_start;
+          if (top_offset < 1) {
+            rows_above++;
+          }
+          for (var i = items_start; i < items_end; i++) {
+            rows[i] && this_cluster_rows.push(rows[i]);
+          }
+          return {
+            top_offset,
+            bottom_offset,
+            rows_above,
+            rows: this_cluster_rows
+          };
+        },
+        renderExtraTag: function(class_name, height) {
+          var tag = document.createElement(this.options.tag), clusterize_prefix = "clusterize-";
+          tag.className = [clusterize_prefix + "extra-row", clusterize_prefix + class_name].join(" ");
+          height && (tag.style.height = height + "px");
+          return tag.outerHTML;
+        },
+        // if necessary verify data changed and insert to DOM
+        insertToDOM: function(rows, cache) {
+          if (!this.options.cluster_height) {
+            this.exploreEnvironment(rows, cache);
+          }
+          var data = this.generate(rows), this_cluster_rows = data.rows.join(""), this_cluster_content_changed = this.checkChanges("data", this_cluster_rows, cache), top_offset_changed = this.checkChanges("top", data.top_offset, cache), only_bottom_offset_changed = this.checkChanges("bottom", data.bottom_offset, cache), callbacks = this.options.callbacks, layout = [];
+          if (this_cluster_content_changed || top_offset_changed) {
+            if (data.top_offset) {
+              this.options.keep_parity && layout.push(this.renderExtraTag("keep-parity"));
+              layout.push(this.renderExtraTag("top-space", data.top_offset));
+            }
+            layout.push(this_cluster_rows);
+            data.bottom_offset && layout.push(this.renderExtraTag("bottom-space", data.bottom_offset));
+            callbacks.clusterWillChange && callbacks.clusterWillChange();
+            this.html(layout.join(""));
+            this.options.content_tag == "ol" && this.content_elem.setAttribute("start", data.rows_above);
+            this.content_elem.style["counter-increment"] = "clusterize-counter " + (data.rows_above - 1);
+            callbacks.clusterChanged && callbacks.clusterChanged();
+          } else if (only_bottom_offset_changed) {
+            this.content_elem.lastChild.style.height = data.bottom_offset + "px";
+          }
+        },
+        // unfortunately ie <= 9 does not allow to use innerHTML for table elements, so make a workaround
+        html: function(data) {
+          var content_elem = this.content_elem;
+          if (ie && ie <= 9 && this.options.tag == "tr") {
+            var div = document.createElement("div"), last;
+            div.innerHTML = "<table><tbody>" + data + "</tbody></table>";
+            while (last = content_elem.lastChild) {
+              content_elem.removeChild(last);
+            }
+            var rows_nodes = this.getChildNodes(div.firstChild.firstChild);
+            while (rows_nodes.length) {
+              content_elem.appendChild(rows_nodes.shift());
+            }
+          } else {
+            content_elem.innerHTML = data;
+          }
+        },
+        getChildNodes: function(tag) {
+          var child_nodes = tag.children, nodes = [];
+          for (var i = 0, ii = child_nodes.length; i < ii; i++) {
+            nodes.push(child_nodes[i]);
+          }
+          return nodes;
+        },
+        checkChanges: function(type, value, cache) {
+          var changed = value != cache[type];
+          cache[type] = value;
+          return changed;
+        }
+      };
+      function on(evt, element, fnc) {
+        return element.addEventListener ? element.addEventListener(evt, fnc, false) : element.attachEvent("on" + evt, fnc);
+      }
+      function off(evt, element, fnc) {
+        return element.removeEventListener ? element.removeEventListener(evt, fnc, false) : element.detachEvent("on" + evt, fnc);
+      }
+      function isArray(arr) {
+        return Object.prototype.toString.call(arr) === "[object Array]";
+      }
+      function getStyle(prop, elem) {
+        return window.getComputedStyle ? window.getComputedStyle(elem)[prop] : elem.currentStyle[prop];
+      }
+      return Clusterize2;
+    });
+  }
+});
 
 // src/main.ts
 var main_exports = {};
@@ -26,6 +319,7 @@ var import_obsidian2 = require("obsidian");
 
 // src/views/DailyNotesView.ts
 var import_obsidian = require("obsidian");
+var import_clusterize = __toESM(require_clusterize());
 
 // src/services/DateParser.ts
 var DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -188,10 +482,15 @@ var ObsidianVaultAdapter = class {
 
 // src/views/DailyNotesView.ts
 var VIEW_TYPE_DAILY_NOTES = "daily-notes-view";
+var SHOW_DATED_NOTES = true;
+var SHOW_HEADINGS = true;
+var SHOW_UNDATED_NOTES = false;
 var DailyNotesView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
+    this.clusterize = null;
+    this.allItems = [];
     this.scanner = new DateNoteScanner(new ObsidianVaultAdapter(this.app.vault));
     this.headingScanner = new HeadingScanner(
       () => this.app.vault.getMarkdownFiles(),
@@ -208,18 +507,38 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     return "calendar";
   }
   async onOpen() {
-    await this.redraw();
+    setTimeout(() => this.redraw(), 0);
   }
   async onClose() {
+    if (this.clusterize) {
+      this.clusterize.destroy(true);
+      this.clusterize = null;
+    }
   }
   async redraw() {
+    if (this.clusterize) {
+      this.clusterize.destroy(true);
+      this.clusterize = null;
+    }
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("daily-notes-container");
-    const notes = this.scanner.scanForDailyNotes();
-    const headings = this.headingScanner.scanForDatedHeadings();
-    const allItems = [...notes, ...headings];
-    allItems.sort((a, b) => {
+    let items = [];
+    if (SHOW_DATED_NOTES || SHOW_UNDATED_NOTES) {
+      const notes = this.scanner.scanForDailyNotes();
+      for (const note of notes) {
+        const isDated = note.parsedDate !== null;
+        if (isDated && SHOW_DATED_NOTES || !isDated && SHOW_UNDATED_NOTES) {
+          items.push(note);
+        }
+      }
+    }
+    if (SHOW_HEADINGS) {
+      const headings = this.headingScanner.scanForDatedHeadings();
+      items = items.concat(headings);
+    }
+    this.allItems = items;
+    this.allItems.sort((a, b) => {
       const cmp = b.sortKey - a.sortKey;
       if (cmp !== 0)
         return cmp;
@@ -227,30 +546,47 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       const bText = b.type === "note" ? b.file.basename : b.heading;
       return aText.localeCompare(bText);
     });
-    if (allItems.length === 0) {
+    if (this.allItems.length === 0) {
       container.createDiv({
         cls: "daily-notes-empty",
         text: "No notes found"
       });
       return;
     }
-    const navContainer = container.createDiv({ cls: "nav-files-container" });
-    for (const item of allItems) {
-      this.renderItem(navContainer, item);
-    }
-  }
-  renderItem(container, item) {
-    const navFile = container.createDiv({ cls: "tree-item nav-file" });
-    const navFileTitle = navFile.createDiv({
-      cls: "tree-item-self nav-file-title is-clickable"
+    const scrollArea = container.createDiv({
+      cls: "clusterize-scroll",
+      attr: { id: "daily-notes-scroll" }
     });
-    const iconEl = navFileTitle.createSpan({ cls: "nav-file-icon" });
-    (0, import_obsidian.setIcon)(iconEl, item.type === "heading" ? "heading" : "file-text");
-    navFileTitle.createSpan({
-      cls: "tree-item-inner nav-file-title-content",
-      text: item.type === "note" ? item.file.basename : item.heading
+    const contentArea = scrollArea.createDiv({
+      cls: "clusterize-content",
+      attr: { id: "daily-notes-content" }
     });
-    navFileTitle.addEventListener("click", (event) => {
+    const rows = this.allItems.map((item, index) => this.renderItemHtml(item, index));
+    this.clusterize = new import_clusterize.default({
+      rows,
+      scrollElem: scrollArea,
+      contentElem: contentArea,
+      rows_in_block: 20,
+      blocks_in_cluster: 4,
+      tag: "div",
+      no_data_text: "No notes found",
+      callbacks: {
+        clusterChanged: () => this.populateIcons(contentArea)
+      }
+    });
+    this.populateIcons(contentArea);
+    contentArea.addEventListener("click", (event) => {
+      const target = event.target;
+      const row = target.closest(".nav-file-title");
+      if (!row)
+        return;
+      const indexStr = row.dataset.index;
+      if (indexStr === void 0)
+        return;
+      const index = parseInt(indexStr, 10);
+      const item = this.allItems[index];
+      if (!item)
+        return;
       const newLeaf = import_obsidian.Keymap.isModEvent(event);
       if (item.type === "heading") {
         this.openHeading(item, newLeaf);
@@ -258,8 +594,30 @@ var DailyNotesView = class extends import_obsidian.ItemView {
         this.openFile(item.file, newLeaf);
       }
     });
-    navFileTitle.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
+  }
+  renderItemHtml(item, index) {
+    const iconName = item.type === "heading" ? "heading" : "file-text";
+    const text = item.type === "note" ? item.file.basename : item.heading;
+    const escapedText = this.escapeHtml(text);
+    return `<div class="tree-item nav-file">
+      <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
+        <span class="nav-file-icon" data-icon="${iconName}"></span>
+        <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
+      </div>
+    </div>`;
+  }
+  escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  populateIcons(container) {
+    const iconElements = container.querySelectorAll(".nav-file-icon[data-icon]");
+    iconElements.forEach((el) => {
+      const iconName = el.getAttribute("data-icon");
+      if (iconName && el.children.length === 0) {
+        (0, import_obsidian.setIcon)(el, iconName);
+      }
     });
   }
   openFile(file, newLeaf) {
@@ -299,22 +657,25 @@ var DailyNotesBrowserPlugin = class extends import_obsidian2.Plugin {
         this.activateView();
       }
     });
-    this.registerEvent(
-      this.app.vault.on("create", () => this.refreshView())
-    );
-    this.registerEvent(
-      this.app.vault.on("delete", () => this.refreshView())
-    );
-    this.registerEvent(
-      this.app.vault.on("rename", () => this.refreshView())
-    );
-    this.registerEvent(
-      this.app.metadataCache.on("changed", () => this.refreshView())
-    );
-    if (this.app.workspace.layoutReady) {
+    const onReady = () => {
       this.initLeaf();
+      this.registerEvent(
+        this.app.vault.on("create", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.vault.on("delete", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.vault.on("rename", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.metadataCache.on("changed", () => this.refreshView())
+      );
+    };
+    if (this.app.workspace.layoutReady) {
+      onReady();
     } else {
-      this.app.workspace.onLayoutReady(() => this.initLeaf());
+      this.app.workspace.onLayoutReady(() => onReady());
     }
   }
   async onunload() {

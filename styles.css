@@ -3,7 +3,7 @@
 .daily-notes-container {
   padding: 0;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .daily-notes-empty {
@@ -13,20 +13,37 @@
   text-align: center;
 }
 
-.daily-notes-container .nav-files-container {
-  padding: 4px 0;
+/* Clusterize scroll container */
+.daily-notes-container .clusterize-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.daily-notes-container .clusterize-content {
+  padding: 0;
+}
+
+.daily-notes-container .clusterize-no-data {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  text-align: center;
 }
 
 .daily-notes-container .nav-file {
   padding: 0;
+  height: 28px;
+  box-sizing: border-box;
 }
 
 .daily-notes-container .nav-file-title {
   display: flex;
   align-items: center;
-  padding: 4px 8px 4px 16px;
+  height: 100%;
+  padding: 0 8px 0 16px;
   font-size: var(--nav-item-size);
-  line-height: var(--line-height-tight);
+  line-height: 28px;
   color: var(--nav-item-color);
   cursor: pointer;
   border-radius: var(--radius-s);

@@ -20,27 +20,29 @@ export default class DailyNotesBrowserPlugin extends Plugin {
       },
     });
 
-    // Register vault events to refresh the view when files change
-    this.registerEvent(
-      this.app.vault.on("create", () => this.refreshView())
-    );
-    this.registerEvent(
-      this.app.vault.on("delete", () => this.refreshView())
-    );
-    this.registerEvent(
-      this.app.vault.on("rename", () => this.refreshView())
-    );
-
-    // Refresh view when file content changes (for heading updates)
-    this.registerEvent(
-      this.app.metadataCache.on("changed", () => this.refreshView())
-    );
-
     // Open view in left sidebar when layout is ready
-    if (this.app.workspace.layoutReady) {
+    // Defer event registration to avoid startup spam
+    const onReady = () => {
       this.initLeaf();
+
+      this.registerEvent(
+        this.app.vault.on("create", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.vault.on("delete", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.vault.on("rename", () => this.refreshView())
+      );
+      this.registerEvent(
+        this.app.metadataCache.on("changed", () => this.refreshView())
+      );
+    };
+
+    if (this.app.workspace.layoutReady) {
+      onReady();
     } else {
-      this.app.workspace.onLayoutReady(() => this.initLeaf());
+      this.app.workspace.onLayoutReady(() => onReady());
     }
   }
 

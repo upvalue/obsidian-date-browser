@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf, TFile, Keymap, MarkdownView, setIcon } from "obsidian";
+import Clusterize from "clusterize.js";
 import type DailyNotesBrowserPlugin from "../main";
 import { DateNoteScanner } from "../services/DateNoteScanner";
 import { HeadingScanner } from "../services/HeadingScanner";
@@ -8,9 +9,16 @@ import type { HeadingItem } from "../models/HeadingItem";
 
 export const VIEW_TYPE_DAILY_NOTES = "daily-notes-view";
 
+// Feature flags for item types
+const SHOW_DATED_NOTES = true;
+const SHOW_HEADINGS = true;
+const SHOW_UNDATED_NOTES = false;
+
 export class DailyNotesView extends ItemView {
   private scanner: DateNoteScanner<TFile>;
   private headingScanner: HeadingScanner<TFile>;
+  private clusterize: Clusterize | null = null;
+  private allItems: BrowsableItem<TFile>[] = [];
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -37,33 +45,56 @@ export class DailyNotesView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    await this.redraw();
+    setTimeout(() => this.redraw(), 0);
   }
 
   async onClose(): Promise<void> {
-    // Cleanup if needed
+    if (this.clusterize) {
+      this.clusterize.destroy(true);
+      this.clusterize = null;
+    }
   }
 
   async redraw(): Promise<void> {
+    // Cleanup previous instance
+    if (this.clusterize) {
+      this.clusterize.destroy(true);
+      this.clusterize = null;
+    }
+
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("daily-notes-container");
 
-    const notes = this.scanner.scanForDailyNotes();
-    const headings = this.headingScanner.scanForDatedHeadings();
+    // Collect items based on feature flags
+    let items: BrowsableItem<TFile>[] = [];
 
-    // Merge and sort by sortKey descending, then alphabetically
-    const allItems: BrowsableItem<TFile>[] = [...notes, ...headings];
-    allItems.sort((a, b) => {
+    if (SHOW_DATED_NOTES || SHOW_UNDATED_NOTES) {
+      const notes = this.scanner.scanForDailyNotes();
+      for (const note of notes) {
+        const isDated = note.parsedDate !== null;
+        if ((isDated && SHOW_DATED_NOTES) || (!isDated && SHOW_UNDATED_NOTES)) {
+          items.push(note);
+        }
+      }
+    }
+
+    if (SHOW_HEADINGS) {
+      const headings = this.headingScanner.scanForDatedHeadings();
+      items = items.concat(headings);
+    }
+
+    // Sort by sortKey descending, then alphabetically
+    this.allItems = items;
+    this.allItems.sort((a, b) => {
       const cmp = b.sortKey - a.sortKey;
       if (cmp !== 0) return cmp;
-      // For ties, sort by display text
       const aText = a.type === "note" ? a.file.basename : a.heading;
       const bText = b.type === "note" ? b.file.basename : b.heading;
       return aText.localeCompare(bText);
     });
 
-    if (allItems.length === 0) {
+    if (this.allItems.length === 0) {
       container.createDiv({
         cls: "daily-notes-empty",
         text: "No notes found",
@@ -71,30 +102,49 @@ export class DailyNotesView extends ItemView {
       return;
     }
 
-    const navContainer = container.createDiv({ cls: "nav-files-container" });
-
-    for (const item of allItems) {
-      this.renderItem(navContainer, item);
-    }
-  }
-
-  private renderItem(container: HTMLElement, item: BrowsableItem<TFile>): void {
-    const navFile = container.createDiv({ cls: "tree-item nav-file" });
-    const navFileTitle = navFile.createDiv({
-      cls: "tree-item-self nav-file-title is-clickable",
+    // Create Clusterize structure
+    const scrollArea = container.createDiv({
+      cls: "clusterize-scroll",
+      attr: { id: "daily-notes-scroll" },
+    });
+    const contentArea = scrollArea.createDiv({
+      cls: "clusterize-content",
+      attr: { id: "daily-notes-content" },
     });
 
-    // Icon for item type
-    const iconEl = navFileTitle.createSpan({ cls: "nav-file-icon" });
-    setIcon(iconEl, item.type === "heading" ? "heading" : "file-text");
+    // Generate row HTML
+    const rows = this.allItems.map((item, index) => this.renderItemHtml(item, index));
 
-    // Display text: basename for notes, heading text for headings
-    navFileTitle.createSpan({
-      cls: "tree-item-inner nav-file-title-content",
-      text: item.type === "note" ? item.file.basename : item.heading,
+    // Initialize Clusterize
+    this.clusterize = new Clusterize({
+      rows,
+      scrollElem: scrollArea,
+      contentElem: contentArea,
+      rows_in_block: 20,
+      blocks_in_cluster: 4,
+      tag: "div",
+      no_data_text: "No notes found",
+      callbacks: {
+        clusterChanged: () => this.populateIcons(contentArea),
+      },
     });
 
-    navFileTitle.addEventListener("click", (event: MouseEvent) => {
+    // Initial icon population
+    this.populateIcons(contentArea);
+
+    // Use event delegation for clicks
+    contentArea.addEventListener("click", (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const row = target.closest(".nav-file-title") as HTMLElement;
+      if (!row) return;
+
+      const indexStr = row.dataset.index;
+      if (indexStr === undefined) return;
+
+      const index = parseInt(indexStr, 10);
+      const item = this.allItems[index];
+      if (!item) return;
+
       const newLeaf = Keymap.isModEvent(event);
       if (item.type === "heading") {
         this.openHeading(item, newLeaf);
@@ -102,11 +152,36 @@ export class DailyNotesView extends ItemView {
         this.openFile(item.file, newLeaf);
       }
     });
+  }
 
-    // Add context menu on right-click
-    navFileTitle.addEventListener("contextmenu", (event: MouseEvent) => {
-      event.preventDefault();
-      // Could add custom context menu here in the future
+  private renderItemHtml(item: BrowsableItem<TFile>, index: number): string {
+    const iconName = item.type === "heading" ? "heading" : "file-text";
+    const text = item.type === "note" ? item.file.basename : item.heading;
+    const escapedText = this.escapeHtml(text);
+
+    // We'll set the icon via CSS or inline SVG
+    // Using Obsidian's icon classes
+    return `<div class="tree-item nav-file">
+      <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
+        <span class="nav-file-icon" data-icon="${iconName}"></span>
+        <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
+      </div>
+    </div>`;
+  }
+
+  private escapeHtml(text: string): string {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  private populateIcons(container: HTMLElement): void {
+    const iconElements = container.querySelectorAll(".nav-file-icon[data-icon]");
+    iconElements.forEach((el) => {
+      const iconName = el.getAttribute("data-icon");
+      if (iconName && el.children.length === 0) {
+        setIcon(el as HTMLElement, iconName);
+      }
     });
   }
 
@@ -131,7 +206,6 @@ export class DailyNotesView extends ItemView {
     if (leaf) {
       await leaf.openFile(item.file);
 
-      // Scroll to heading line after file is open
       if (leaf.view instanceof MarkdownView) {
         leaf.view.editor.scrollIntoView(
           {

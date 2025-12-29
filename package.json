@@ -17,6 +17,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/clusterize.js": "^0.18.3",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.0",
     "esbuild": "^0.20.0",
@@ -24,5 +25,8 @@
     "obsidian": "^1.5.0",
     "ts-jest": "^29.1.2",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "clusterize.js": "^1.0.0"
   }
 }
