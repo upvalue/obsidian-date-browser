@@ -29,6 +29,7 @@ var import_obsidian = require("obsidian");
 
 // src/services/DateParser.ts
 var DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})/;
+var WEEKLY_PATTERN = /^(\d{4})-W(\d{1,2})/;
 function parseDate(input) {
   const match = input.match(DATE_PATTERN);
   if (!match)
@@ -49,34 +50,126 @@ function parseDate(input) {
     sortKey: year * 1e4 + month * 100 + day
   };
 }
-function parseFilename(filename) {
-  return parseDate(filename);
+function parseHeading(headingText) {
+  return parseDate(headingText);
+}
+function sundayOfWeek(year, week) {
+  const jan1 = new Date(year, 0, 1);
+  const jan1DayOfWeek = jan1.getDay();
+  const daysToFirstSunday = jan1DayOfWeek === 0 ? 0 : 7 - jan1DayOfWeek;
+  const targetDate = new Date(year, 0, 1 + daysToFirstSunday + (week - 1) * 7);
+  return {
+    year: targetDate.getFullYear(),
+    month: targetDate.getMonth() + 1,
+    day: targetDate.getDate()
+  };
+}
+function parseWeeklyDate(input) {
+  const match = input.match(WEEKLY_PATTERN);
+  if (!match)
+    return null;
+  const [matchedPart, yearStr, weekStr] = match;
+  const year = parseInt(yearStr, 10);
+  const week = parseInt(weekStr, 10);
+  if (week < 1 || week > 53)
+    return null;
+  const { year: computedYear, month, day } = sundayOfWeek(year, week);
+  const monthStr = String(month).padStart(2, "0");
+  const dayStr = String(day).padStart(2, "0");
+  return {
+    year: computedYear,
+    month,
+    day,
+    dateString: `${computedYear}-${monthStr}-${dayStr}`,
+    sortKey: computedYear * 1e4 + month * 100 + day,
+    originalFormat: matchedPart
+  };
+}
+function parseFilenameExtended(filename) {
+  const dailyParsed = parseDate(filename);
+  if (dailyParsed)
+    return dailyParsed;
+  return parseWeeklyDate(filename);
 }
 
 // src/services/DateNoteScanner.ts
+var FALLBACK_SORT_KEY = 20000101;
 var DateNoteScanner = class {
   constructor(vault) {
     this.vault = vault;
   }
   /**
-   * Scans the vault for notes with YYYY-MM-DD filename prefixes.
-   * Returns them sorted by date descending (most recent first).
+   * Scans the vault for all markdown notes.
+   * Dated notes (YYYY-MM-DD or YYYY-Www) are sorted by date descending.
+   * Undated notes are sorted to the end (as 2000-01-01), then alphabetically.
    */
   scanForDailyNotes() {
+    var _a;
     const allFiles = this.vault.getMarkdownFiles();
-    const dailyNotes = [];
+    const items = [];
     for (const file of allFiles) {
-      const parsed = parseFilename(file.basename);
+      const parsed = parseFilenameExtended(file.basename);
       if (parsed) {
-        dailyNotes.push({
+        items.push({
+          type: "note",
           file,
           parsedDate: parsed,
-          displayDate: parsed.dateString
+          displayDate: (_a = parsed.originalFormat) != null ? _a : parsed.dateString,
+          sortKey: parsed.sortKey
+        });
+      } else {
+        items.push({
+          type: "note",
+          file,
+          parsedDate: null,
+          displayDate: file.basename,
+          sortKey: FALLBACK_SORT_KEY
         });
       }
     }
-    dailyNotes.sort((a, b) => b.parsedDate.sortKey - a.parsedDate.sortKey);
-    return dailyNotes;
+    items.sort((a, b) => {
+      const dateCompare = b.sortKey - a.sortKey;
+      if (dateCompare !== 0)
+        return dateCompare;
+      return a.file.basename.localeCompare(b.file.basename);
+    });
+    return items;
+  }
+};
+
+// src/services/HeadingScanner.ts
+var HeadingScanner = class {
+  constructor(getFiles, getCache) {
+    this.getFiles = getFiles;
+    this.getCache = getCache;
+  }
+  /**
+   * Scans all files for headings that start with YYYY-MM-DD format.
+   * Uses metadata cache for performance (no file I/O).
+   */
+  scanForDatedHeadings() {
+    const items = [];
+    for (const file of this.getFiles()) {
+      const cache = this.getCache(file);
+      if (!(cache == null ? void 0 : cache.headings))
+        continue;
+      for (const h of cache.headings) {
+        const parsed = parseHeading(h.heading);
+        if (parsed) {
+          items.push({
+            type: "heading",
+            file,
+            heading: h.heading,
+            level: h.level,
+            parsedDate: parsed,
+            displayDate: parsed.dateString,
+            lineNumber: h.position.start.line,
+            sortKey: parsed.sortKey
+          });
+        }
+      }
+    }
+    return items;
   }
 };
 
@@ -100,6 +193,10 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     super(leaf);
     this.plugin = plugin;
     this.scanner = new DateNoteScanner(new ObsidianVaultAdapter(this.app.vault));
+    this.headingScanner = new HeadingScanner(
+      () => this.app.vault.getMarkdownFiles(),
+      (file) => this.app.metadataCache.getFileCache(file)
+    );
   }
   getViewType() {
     return VIEW_TYPE_DAILY_NOTES;
@@ -119,42 +216,71 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("daily-notes-container");
-    const items = this.scanner.scanForDailyNotes();
-    if (items.length === 0) {
+    const notes = this.scanner.scanForDailyNotes();
+    const headings = this.headingScanner.scanForDatedHeadings();
+    const allItems = [...notes, ...headings];
+    allItems.sort((a, b) => {
+      const cmp = b.sortKey - a.sortKey;
+      if (cmp !== 0)
+        return cmp;
+      const aText = a.type === "note" ? a.file.basename : a.heading;
+      const bText = b.type === "note" ? b.file.basename : b.heading;
+      return aText.localeCompare(bText);
+    });
+    if (allItems.length === 0) {
       container.createDiv({
         cls: "daily-notes-empty",
-        text: "No notes found with YYYY-MM-DD prefix"
+        text: "No notes found"
       });
       return;
     }
     const navContainer = container.createDiv({ cls: "nav-files-container" });
-    for (const item of items) {
-      this.renderNoteItem(navContainer, item);
+    for (const item of allItems) {
+      this.renderItem(navContainer, item);
     }
   }
-  renderNoteItem(container, item) {
+  renderItem(container, item) {
     const navFile = container.createDiv({ cls: "tree-item nav-file" });
     const navFileTitle = navFile.createDiv({
       cls: "tree-item-self nav-file-title is-clickable"
     });
+    const iconEl = navFileTitle.createSpan({ cls: "nav-file-icon" });
+    (0, import_obsidian.setIcon)(iconEl, item.type === "heading" ? "heading" : "file-text");
     navFileTitle.createSpan({
       cls: "tree-item-inner nav-file-title-content",
-      text: item.file.basename
+      text: item.type === "note" ? item.file.basename : item.heading
     });
     navFileTitle.addEventListener("click", (event) => {
       const newLeaf = import_obsidian.Keymap.isModEvent(event);
-      this.openFile(item.file, newLeaf);
+      if (item.type === "heading") {
+        this.openHeading(item, newLeaf);
+      } else {
+        this.openFile(item.file, newLeaf);
+      }
     });
     navFileTitle.addEventListener("contextmenu", (event) => {
-      var _a, _b;
       event.preventDefault();
-      const menu = (_b = (_a = this.app.workspace.getLeaf().view) == null ? void 0 : _a.app) == null ? void 0 : _b.workspace;
     });
   }
   openFile(file, newLeaf) {
     const leaf = newLeaf ? this.app.workspace.getLeaf("tab") : this.app.workspace.getMostRecentLeaf();
     if (leaf) {
       leaf.openFile(file);
+    }
+  }
+  async openHeading(item, newLeaf) {
+    const leaf = newLeaf ? this.app.workspace.getLeaf("tab") : this.app.workspace.getMostRecentLeaf();
+    if (leaf) {
+      await leaf.openFile(item.file);
+      if (leaf.view instanceof import_obsidian.MarkdownView) {
+        leaf.view.editor.scrollIntoView(
+          {
+            from: { line: item.lineNumber, ch: 0 },
+            to: { line: item.lineNumber, ch: 0 }
+          },
+          true
+        );
+      }
     }
   }
 };
@@ -181,6 +307,9 @@ var DailyNotesBrowserPlugin = class extends import_obsidian2.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", () => this.refreshView())
+    );
+    this.registerEvent(
+      this.app.metadataCache.on("changed", () => this.refreshView())
     );
     if (this.app.workspace.layoutReady) {
       this.initLeaf();

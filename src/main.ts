@@ -31,6 +31,11 @@ export default class DailyNotesBrowserPlugin extends Plugin {
       this.app.vault.on("rename", () => this.refreshView())
     );
 
+    // Refresh view when file content changes (for heading updates)
+    this.registerEvent(
+      this.app.metadataCache.on("changed", () => this.refreshView())
+    );
+
     // Open view in left sidebar when layout is ready
     if (this.app.workspace.layoutReady) {
       this.initLeaf();

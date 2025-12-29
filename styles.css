@@ -43,6 +43,22 @@
   color: var(--nav-item-color-active);
 }
 
+.daily-notes-container .nav-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  color: var(--text-muted);
+}
+
+.daily-notes-container .nav-file-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .daily-notes-container .nav-file-title-content {
   white-space: nowrap;
   overflow: hidden;
