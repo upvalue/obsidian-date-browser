@@ -1,0 +1,9 @@
+{
+  "id": "date-browser",
+  "name": "Date Browser",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Browse notes with YYYY-MM-DD prefixes in a dedicated sidebar view, sorted by date.",
+  "author": "",
+  "isDesktopOnly": false
+}

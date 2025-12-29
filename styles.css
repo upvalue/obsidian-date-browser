@@ -1,0 +1,50 @@
+/* Daily Notes Browser Plugin Styles */
+
+.daily-notes-container {
+  padding: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.daily-notes-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  text-align: center;
+}
+
+.daily-notes-container .nav-files-container {
+  padding: 4px 0;
+}
+
+.daily-notes-container .nav-file {
+  padding: 0;
+}
+
+.daily-notes-container .nav-file-title {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 4px 16px;
+  font-size: var(--nav-item-size);
+  line-height: var(--line-height-tight);
+  color: var(--nav-item-color);
+  cursor: pointer;
+  border-radius: var(--radius-s);
+  margin: 0 4px;
+}
+
+.daily-notes-container .nav-file-title:hover {
+  background-color: var(--nav-item-background-hover);
+  color: var(--nav-item-color-hover);
+}
+
+.daily-notes-container .nav-file-title:active {
+  background-color: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+}
+
+.daily-notes-container .nav-file-title-content {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
