@@ -1,12 +1,12 @@
-/* Daily Notes Browser Plugin Styles */
+/* Date Browser Plugin Styles */
 
-.daily-notes-container {
+.date-browser-container {
   padding: 0;
   height: 100%;
   overflow: hidden;
 }
 
-.daily-notes-empty {
+.date-browser-empty {
   padding: 16px;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -14,30 +14,30 @@
 }
 
 /* Clusterize scroll container */
-.daily-notes-container .clusterize-scroll {
+.date-browser-container .clusterize-scroll {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.daily-notes-container .clusterize-content {
+.date-browser-container .clusterize-content {
   padding: 0;
 }
 
-.daily-notes-container .clusterize-no-data {
+.date-browser-container .clusterize-no-data {
   padding: 16px;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   text-align: center;
 }
 
-.daily-notes-container .nav-file {
+.date-browser-container .nav-file {
   padding: 0;
   height: 28px;
   box-sizing: border-box;
 }
 
-.daily-notes-container .nav-file-title {
+.date-browser-container .nav-file-title {
   display: flex;
   align-items: center;
   height: 100%;
@@ -50,17 +50,17 @@
   margin: 0 4px;
 }
 
-.daily-notes-container .nav-file-title:hover {
+.date-browser-container .nav-file-title:hover {
   background-color: var(--nav-item-background-hover);
   color: var(--nav-item-color-hover);
 }
 
-.daily-notes-container .nav-file-title:active {
+.date-browser-container .nav-file-title:active {
   background-color: var(--nav-item-background-active);
   color: var(--nav-item-color-active);
 }
 
-.daily-notes-container .nav-file-icon {
+.date-browser-container .nav-file-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,12 +71,12 @@
   color: var(--text-muted);
 }
 
-.daily-notes-container .nav-file-icon svg {
+.date-browser-container .nav-file-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.daily-notes-container .nav-file-title-content {
+.date-browser-container .nav-file-title-content {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

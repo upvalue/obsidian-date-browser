@@ -7,7 +7,7 @@ import { ObsidianVaultAdapter } from "../interfaces/VaultAdapter";
 import type { BrowsableItem } from "../models/DailyNoteItem";
 import type { HeadingItem } from "../models/HeadingItem";
 
-export const VIEW_TYPE_DAILY_NOTES = "daily-notes-view";
+export const VIEW_TYPE_DATE_BROWSER = "date-browser-view";
 
 // Feature flags for item types
 const SHOW_DATED_NOTES = true;
@@ -19,6 +19,7 @@ export class DailyNotesView extends ItemView {
   private headingScanner: HeadingScanner<TFile>;
   private clusterize: Clusterize | null = null;
   private allItems: BrowsableItem<TFile>[] = [];
+  private activeFilePath: string | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -33,11 +34,11 @@ export class DailyNotesView extends ItemView {
   }
 
   getViewType(): string {
-    return VIEW_TYPE_DAILY_NOTES;
+    return VIEW_TYPE_DATE_BROWSER;
   }
 
   getDisplayText(): string {
-    return "Daily Notes";
+    return "Date Browser";
   }
 
   getIcon(): string {
@@ -45,7 +46,32 @@ export class DailyNotesView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    // Track active file changes
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        const file = leaf?.view instanceof MarkdownView ? leaf.view.file : null;
+        this.activeFilePath = file?.path ?? null;
+        this.updateActiveHighlight();
+      })
+    );
+
+    // Initialize active file
+    const activeFile = this.app.workspace.getActiveFile();
+    this.activeFilePath = activeFile?.path ?? null;
+
     setTimeout(() => this.redraw(), 0);
+  }
+
+  // Called when view is resized or becomes visible again (e.g., after idle)
+  onResize(): void {
+    // Check if content is missing and needs redraw
+    const container = this.containerEl.children[1] as HTMLElement;
+    const hasContent = container?.querySelector(".clusterize-scroll") !== null ||
+                       container?.querySelector(".date-browser-empty") !== null;
+
+    if (!hasContent) {
+      this.redraw();
+    }
   }
 
   async onClose(): Promise<void> {
@@ -64,7 +90,7 @@ export class DailyNotesView extends ItemView {
 
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
-    container.addClass("daily-notes-container");
+    container.addClass("date-browser-container");
 
     // Collect items based on feature flags
     let items: BrowsableItem<TFile>[] = [];
@@ -96,7 +122,7 @@ export class DailyNotesView extends ItemView {
 
     if (this.allItems.length === 0) {
       container.createDiv({
-        cls: "daily-notes-empty",
+        cls: "date-browser-empty",
         text: "No notes found",
       });
       return;
@@ -105,11 +131,11 @@ export class DailyNotesView extends ItemView {
     // Create Clusterize structure
     const scrollArea = container.createDiv({
       cls: "clusterize-scroll",
-      attr: { id: "daily-notes-scroll" },
+      attr: { id: "date-browser-scroll" },
     });
     const contentArea = scrollArea.createDiv({
       cls: "clusterize-content",
-      attr: { id: "daily-notes-content" },
+      attr: { id: "date-browser-content" },
     });
 
     // Generate row HTML
@@ -125,12 +151,16 @@ export class DailyNotesView extends ItemView {
       tag: "div",
       no_data_text: "No notes found",
       callbacks: {
-        clusterChanged: () => this.populateIcons(contentArea),
+        clusterChanged: () => {
+          this.populateIcons(contentArea);
+          this.updateActiveHighlight();
+        },
       },
     });
 
-    // Initial icon population
+    // Initial icon population and highlighting
     this.populateIcons(contentArea);
+    this.updateActiveHighlight();
 
     // Use event delegation for clicks
     contentArea.addEventListener("click", (event: MouseEvent) => {
@@ -182,6 +212,24 @@ export class DailyNotesView extends ItemView {
       if (iconName && el.children.length === 0) {
         setIcon(el as HTMLElement, iconName);
       }
+    });
+  }
+
+  private updateActiveHighlight(): void {
+    const container = this.containerEl.children[1] as HTMLElement;
+    const rows = container?.querySelectorAll(".nav-file-title[data-index]");
+    if (!rows) return;
+
+    rows.forEach((row) => {
+      const indexStr = row.getAttribute("data-index");
+      if (indexStr === null) return;
+
+      const index = parseInt(indexStr, 10);
+      const item = this.allItems[index];
+      if (!item) return;
+
+      const isActive = item.file.path === this.activeFilePath;
+      row.classList.toggle("is-active", isActive);
     });
   }
 

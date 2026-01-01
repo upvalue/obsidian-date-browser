@@ -481,7 +481,7 @@ var ObsidianVaultAdapter = class {
 };
 
 // src/views/DailyNotesView.ts
-var VIEW_TYPE_DAILY_NOTES = "daily-notes-view";
+var VIEW_TYPE_DATE_BROWSER = "date-browser-view";
 var SHOW_DATED_NOTES = true;
 var SHOW_HEADINGS = true;
 var SHOW_UNDATED_NOTES = false;
@@ -491,6 +491,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     this.plugin = plugin;
     this.clusterize = null;
     this.allItems = [];
+    this.activeFilePath = null;
     this.scanner = new DateNoteScanner(new ObsidianVaultAdapter(this.app.vault));
     this.headingScanner = new HeadingScanner(
       () => this.app.vault.getMarkdownFiles(),
@@ -498,16 +499,35 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     );
   }
   getViewType() {
-    return VIEW_TYPE_DAILY_NOTES;
+    return VIEW_TYPE_DATE_BROWSER;
   }
   getDisplayText() {
-    return "Daily Notes";
+    return "Date Browser";
   }
   getIcon() {
     return "calendar";
   }
   async onOpen() {
+    var _a;
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        var _a2;
+        const file = (leaf == null ? void 0 : leaf.view) instanceof import_obsidian.MarkdownView ? leaf.view.file : null;
+        this.activeFilePath = (_a2 = file == null ? void 0 : file.path) != null ? _a2 : null;
+        this.updateActiveHighlight();
+      })
+    );
+    const activeFile = this.app.workspace.getActiveFile();
+    this.activeFilePath = (_a = activeFile == null ? void 0 : activeFile.path) != null ? _a : null;
     setTimeout(() => this.redraw(), 0);
+  }
+  // Called when view is resized or becomes visible again (e.g., after idle)
+  onResize() {
+    const container = this.containerEl.children[1];
+    const hasContent = (container == null ? void 0 : container.querySelector(".clusterize-scroll")) !== null || (container == null ? void 0 : container.querySelector(".date-browser-empty")) !== null;
+    if (!hasContent) {
+      this.redraw();
+    }
   }
   async onClose() {
     if (this.clusterize) {
@@ -522,7 +542,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     }
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("daily-notes-container");
+    container.addClass("date-browser-container");
     let items = [];
     if (SHOW_DATED_NOTES || SHOW_UNDATED_NOTES) {
       const notes = this.scanner.scanForDailyNotes();
@@ -548,18 +568,18 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     });
     if (this.allItems.length === 0) {
       container.createDiv({
-        cls: "daily-notes-empty",
+        cls: "date-browser-empty",
         text: "No notes found"
       });
       return;
     }
     const scrollArea = container.createDiv({
       cls: "clusterize-scroll",
-      attr: { id: "daily-notes-scroll" }
+      attr: { id: "date-browser-scroll" }
     });
     const contentArea = scrollArea.createDiv({
       cls: "clusterize-content",
-      attr: { id: "daily-notes-content" }
+      attr: { id: "date-browser-content" }
     });
     const rows = this.allItems.map((item, index) => this.renderItemHtml(item, index));
     this.clusterize = new import_clusterize.default({
@@ -571,10 +591,14 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       tag: "div",
       no_data_text: "No notes found",
       callbacks: {
-        clusterChanged: () => this.populateIcons(contentArea)
+        clusterChanged: () => {
+          this.populateIcons(contentArea);
+          this.updateActiveHighlight();
+        }
       }
     });
     this.populateIcons(contentArea);
+    this.updateActiveHighlight();
     contentArea.addEventListener("click", (event) => {
       const target = event.target;
       const row = target.closest(".nav-file-title");
@@ -620,6 +644,23 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       }
     });
   }
+  updateActiveHighlight() {
+    const container = this.containerEl.children[1];
+    const rows = container == null ? void 0 : container.querySelectorAll(".nav-file-title[data-index]");
+    if (!rows)
+      return;
+    rows.forEach((row) => {
+      const indexStr = row.getAttribute("data-index");
+      if (indexStr === null)
+        return;
+      const index = parseInt(indexStr, 10);
+      const item = this.allItems[index];
+      if (!item)
+        return;
+      const isActive = item.file.path === this.activeFilePath;
+      row.classList.toggle("is-active", isActive);
+    });
+  }
   openFile(file, newLeaf) {
     const leaf = newLeaf ? this.app.workspace.getLeaf("tab") : this.app.workspace.getMostRecentLeaf();
     if (leaf) {
@@ -646,13 +687,13 @@ var DailyNotesView = class extends import_obsidian.ItemView {
 // src/main.ts
 var DailyNotesBrowserPlugin = class extends import_obsidian2.Plugin {
   async onload() {
-    this.registerView(VIEW_TYPE_DAILY_NOTES, (leaf) => new DailyNotesView(leaf, this));
-    this.addRibbonIcon("calendar", "Open Daily Notes", () => {
+    this.registerView(VIEW_TYPE_DATE_BROWSER, (leaf) => new DailyNotesView(leaf, this));
+    this.addRibbonIcon("calendar", "Open Date Browser", () => {
       this.activateView();
     });
     this.addCommand({
-      id: "open-daily-notes-view",
-      name: "Open Daily Notes view",
+      id: "open-date-browser-view",
+      name: "Open Date Browser view",
       callback: () => {
         this.activateView();
       }
@@ -671,6 +712,7 @@ var DailyNotesBrowserPlugin = class extends import_obsidian2.Plugin {
       this.registerEvent(
         this.app.metadataCache.on("changed", () => this.refreshView())
       );
+      this.registerDomEvent(window, "focus", () => this.refreshView());
     };
     if (this.app.workspace.layoutReady) {
       onReady();
@@ -679,34 +721,34 @@ var DailyNotesBrowserPlugin = class extends import_obsidian2.Plugin {
     }
   }
   async onunload() {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DAILY_NOTES);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DATE_BROWSER);
   }
   async initLeaf() {
     var _a;
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY_NOTES);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DATE_BROWSER);
     if (leaves.length === 0) {
       await ((_a = this.app.workspace.getLeftLeaf(false)) == null ? void 0 : _a.setViewState({
-        type: VIEW_TYPE_DAILY_NOTES,
+        type: VIEW_TYPE_DATE_BROWSER,
         active: true
       }));
     }
   }
   async activateView() {
     var _a;
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY_NOTES);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DATE_BROWSER);
     if (leaves.length === 0) {
       await ((_a = this.app.workspace.getLeftLeaf(false)) == null ? void 0 : _a.setViewState({
-        type: VIEW_TYPE_DAILY_NOTES,
+        type: VIEW_TYPE_DATE_BROWSER,
         active: true
       }));
     }
-    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY_NOTES)[0];
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_DATE_BROWSER)[0];
     if (leaf) {
       this.app.workspace.revealLeaf(leaf);
     }
   }
   refreshView() {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY_NOTES);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DATE_BROWSER);
     for (const leaf of leaves) {
       const view = leaf.view;
       if (view instanceof DailyNotesView) {
