@@ -64,13 +64,16 @@ export class DailyNotesView extends ItemView {
 
   // Called when view is resized or becomes visible again (e.g., after idle)
   onResize(): void {
-    // Check if content is missing and needs redraw
     const container = this.containerEl.children[1] as HTMLElement;
     const hasContent = container?.querySelector(".clusterize-scroll") !== null ||
                        container?.querySelector(".date-browser-empty") !== null;
 
     if (!hasContent) {
+      // Content missing entirely - full redraw needed
       this.redraw();
+    } else if (this.clusterize) {
+      // Content exists - quick refresh to ensure visible items are rendered
+      this.clusterize.refresh();
     }
   }
 
@@ -163,7 +166,7 @@ export class DailyNotesView extends ItemView {
     this.updateActiveHighlight();
 
     // Use event delegation for clicks
-    contentArea.addEventListener("click", (event: MouseEvent) => {
+    const handleClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       const row = target.closest(".nav-file-title") as HTMLElement;
       if (!row) return;
@@ -175,13 +178,16 @@ export class DailyNotesView extends ItemView {
       const item = this.allItems[index];
       if (!item) return;
 
-      const newLeaf = Keymap.isModEvent(event);
+      const newLeaf = Keymap.isModEvent(event) || event.button === 1;
       if (item.type === "heading") {
         this.openHeading(item, newLeaf);
       } else {
         this.openFile(item.file, newLeaf);
       }
-    });
+    };
+
+    contentArea.addEventListener("click", handleClick);
+    contentArea.addEventListener("auxclick", handleClick);
   }
 
   private renderItemHtml(item: BrowsableItem<TFile>, index: number): string {

@@ -527,6 +527,8 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     const hasContent = (container == null ? void 0 : container.querySelector(".clusterize-scroll")) !== null || (container == null ? void 0 : container.querySelector(".date-browser-empty")) !== null;
     if (!hasContent) {
       this.redraw();
+    } else if (this.clusterize) {
+      this.clusterize.refresh();
     }
   }
   async onClose() {
@@ -599,7 +601,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     });
     this.populateIcons(contentArea);
     this.updateActiveHighlight();
-    contentArea.addEventListener("click", (event) => {
+    const handleClick = (event) => {
       const target = event.target;
       const row = target.closest(".nav-file-title");
       if (!row)
@@ -611,13 +613,15 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       const item = this.allItems[index];
       if (!item)
         return;
-      const newLeaf = import_obsidian.Keymap.isModEvent(event);
+      const newLeaf = import_obsidian.Keymap.isModEvent(event) || event.button === 1;
       if (item.type === "heading") {
         this.openHeading(item, newLeaf);
       } else {
         this.openFile(item.file, newLeaf);
       }
-    });
+    };
+    contentArea.addEventListener("click", handleClick);
+    contentArea.addEventListener("auxclick", handleClick);
   }
   renderItemHtml(item, index) {
     const iconName = item.type === "heading" ? "heading" : "file-text";
