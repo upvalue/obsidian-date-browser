@@ -14,12 +14,17 @@ const SHOW_DATED_NOTES = true;
 const SHOW_HEADINGS = true;
 const SHOW_UNDATED_NOTES = false;
 
+// Patterns for pinned items
+const WEEKLY_NOTE_PATTERN = /^\d{4}-W\d{1,2}/;
+const CYCLE_HEADING_PATTERN = /^\d{4}-\d{2}-\d{2} \d+W Cycle \d+/;
+
 export class DailyNotesView extends ItemView {
   private scanner: DateNoteScanner<TFile>;
   private headingScanner: HeadingScanner<TFile>;
   private clusterize: Clusterize | null = null;
   private allItems: BrowsableItem<TFile>[] = [];
   private activeFilePath: string | null = null;
+  private pinnedIndices: Set<number> = new Set();
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -114,14 +119,49 @@ export class DailyNotesView extends ItemView {
     }
 
     // Sort by sortKey descending, then alphabetically
-    this.allItems = items;
-    this.allItems.sort((a, b) => {
+    items.sort((a, b) => {
       const cmp = b.sortKey - a.sortKey;
       if (cmp !== 0) return cmp;
       const aText = a.type === "note" ? a.file.basename : a.heading;
       const bText = b.type === "note" ? b.file.basename : b.heading;
       return aText.localeCompare(bText);
     });
+
+    // Find pinned items in a single pass (most recent of each type)
+    // Items are already sorted by sortKey descending, so first match = most recent
+    const pinnedItems: BrowsableItem<TFile>[] = [];
+    const regularItems: BrowsableItem<TFile>[] = [];
+    this.pinnedIndices.clear();
+
+    let foundWeekly = false;
+    let foundCycle = false;
+
+    for (const item of items) {
+      let isPinned = false;
+
+      if (!foundWeekly && item.type === "note" &&
+          item.parsedDate?.originalFormat &&
+          WEEKLY_NOTE_PATTERN.test(item.parsedDate.originalFormat)) {
+        foundWeekly = true;
+        isPinned = true;
+      }
+
+      if (!foundCycle && item.type === "heading" &&
+          CYCLE_HEADING_PATTERN.test(item.heading)) {
+        foundCycle = true;
+        isPinned = true;
+      }
+
+      if (isPinned) {
+        this.pinnedIndices.add(pinnedItems.length);
+        pinnedItems.push(item);
+      } else {
+        regularItems.push(item);
+      }
+    }
+
+    // Store all items (pinned indices are 0-based into pinnedItems, rest offset by pinnedItems.length)
+    this.allItems = [...pinnedItems, ...regularItems];
 
     if (this.allItems.length === 0) {
       container.createDiv({
@@ -131,7 +171,28 @@ export class DailyNotesView extends ItemView {
       return;
     }
 
-    // Create Clusterize structure
+    // Render pinned items in a fixed header (outside Clusterize)
+    if (pinnedItems.length > 0) {
+      const pinnedArea = container.createDiv({ cls: "date-browser-pinned" });
+      for (let i = 0; i < pinnedItems.length; i++) {
+        pinnedArea.insertAdjacentHTML(
+          "beforeend",
+          this.renderItemHtml(pinnedItems[i], i)
+        );
+      }
+      this.populateIcons(pinnedArea);
+      container.createDiv({ cls: "date-browser-separator" });
+
+      // Click handler for pinned area
+      pinnedArea.addEventListener("click", (event: MouseEvent) =>
+        this.handleItemClick(event)
+      );
+      pinnedArea.addEventListener("auxclick", (event: MouseEvent) =>
+        this.handleItemClick(event)
+      );
+    }
+
+    // Create Clusterize structure for regular items
     const scrollArea = container.createDiv({
       cls: "clusterize-scroll",
       attr: { id: "date-browser-scroll" },
@@ -141,8 +202,10 @@ export class DailyNotesView extends ItemView {
       attr: { id: "date-browser-content" },
     });
 
-    // Generate row HTML
-    const rows = this.allItems.map((item, index) => this.renderItemHtml(item, index));
+    // Generate row HTML for regular items only (indices offset by pinned count)
+    const rows = regularItems.map((item, i) =>
+      this.renderItemHtml(item, pinnedItems.length + i)
+    );
 
     // Initialize Clusterize
     this.clusterize = new Clusterize({
@@ -165,39 +228,43 @@ export class DailyNotesView extends ItemView {
     this.populateIcons(contentArea);
     this.updateActiveHighlight();
 
-    // Use event delegation for clicks
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      const row = target.closest(".nav-file-title") as HTMLElement;
-      if (!row) return;
+    // Use event delegation for clicks on Clusterize content
+    contentArea.addEventListener("click", (event: MouseEvent) =>
+      this.handleItemClick(event)
+    );
+    contentArea.addEventListener("auxclick", (event: MouseEvent) =>
+      this.handleItemClick(event)
+    );
+  }
 
-      const indexStr = row.dataset.index;
-      if (indexStr === undefined) return;
+  private handleItemClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    const row = target.closest(".nav-file-title") as HTMLElement;
+    if (!row) return;
 
-      const index = parseInt(indexStr, 10);
-      const item = this.allItems[index];
-      if (!item) return;
+    const indexStr = row.dataset.index;
+    if (indexStr === undefined) return;
 
-      const newLeaf = Keymap.isModEvent(event) || event.button === 1;
-      if (item.type === "heading") {
-        this.openHeading(item, newLeaf);
-      } else {
-        this.openFile(item.file, newLeaf);
-      }
-    };
+    const index = parseInt(indexStr, 10);
+    const item = this.allItems[index];
+    if (!item) return;
 
-    contentArea.addEventListener("click", handleClick);
-    contentArea.addEventListener("auxclick", handleClick);
+    const newLeaf = Keymap.isModEvent(event) || event.button === 1;
+    if (item.type === "heading") {
+      this.openHeading(item, newLeaf);
+    } else {
+      this.openFile(item.file, newLeaf);
+    }
   }
 
   private renderItemHtml(item: BrowsableItem<TFile>, index: number): string {
     const iconName = item.type === "heading" ? "heading" : "file-text";
     const text = item.type === "note" ? item.file.basename : item.heading;
     const escapedText = this.escapeHtml(text);
+    const isPinned = this.pinnedIndices.has(index);
+    const pinnedClass = isPinned ? " is-pinned" : "";
 
-    // We'll set the icon via CSS or inline SVG
-    // Using Obsidian's icon classes
-    return `<div class="tree-item nav-file">
+    return `<div class="tree-item nav-file${pinnedClass}">
       <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
         <span class="nav-file-icon" data-icon="${iconName}"></span>
         <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
@@ -212,7 +279,7 @@ export class DailyNotesView extends ItemView {
   }
 
   private populateIcons(container: HTMLElement): void {
-    const iconElements = container.querySelectorAll(".nav-file-icon[data-icon]");
+    const iconElements = container.querySelectorAll("[data-icon]");
     iconElements.forEach((el) => {
       const iconName = el.getAttribute("data-icon");
       if (iconName && el.children.length === 0) {

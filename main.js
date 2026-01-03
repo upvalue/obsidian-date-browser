@@ -485,6 +485,8 @@ var VIEW_TYPE_DATE_BROWSER = "date-browser-view";
 var SHOW_DATED_NOTES = true;
 var SHOW_HEADINGS = true;
 var SHOW_UNDATED_NOTES = false;
+var WEEKLY_NOTE_PATTERN = /^\d{4}-W\d{1,2}/;
+var CYCLE_HEADING_PATTERN = /^\d{4}-\d{2}-\d{2} \d+W Cycle \d+/;
 var DailyNotesView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -492,6 +494,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     this.clusterize = null;
     this.allItems = [];
     this.activeFilePath = null;
+    this.pinnedIndices = /* @__PURE__ */ new Set();
     this.scanner = new DateNoteScanner(new ObsidianVaultAdapter(this.app.vault));
     this.headingScanner = new HeadingScanner(
       () => this.app.vault.getMarkdownFiles(),
@@ -538,6 +541,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     }
   }
   async redraw() {
+    var _a;
     if (this.clusterize) {
       this.clusterize.destroy(true);
       this.clusterize = null;
@@ -559,8 +563,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       const headings = this.headingScanner.scanForDatedHeadings();
       items = items.concat(headings);
     }
-    this.allItems = items;
-    this.allItems.sort((a, b) => {
+    items.sort((a, b) => {
       const cmp = b.sortKey - a.sortKey;
       if (cmp !== 0)
         return cmp;
@@ -568,12 +571,54 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       const bText = b.type === "note" ? b.file.basename : b.heading;
       return aText.localeCompare(bText);
     });
+    const pinnedItems = [];
+    const regularItems = [];
+    this.pinnedIndices.clear();
+    let foundWeekly = false;
+    let foundCycle = false;
+    for (const item of items) {
+      let isPinned = false;
+      if (!foundWeekly && item.type === "note" && ((_a = item.parsedDate) == null ? void 0 : _a.originalFormat) && WEEKLY_NOTE_PATTERN.test(item.parsedDate.originalFormat)) {
+        foundWeekly = true;
+        isPinned = true;
+      }
+      if (!foundCycle && item.type === "heading" && CYCLE_HEADING_PATTERN.test(item.heading)) {
+        foundCycle = true;
+        isPinned = true;
+      }
+      if (isPinned) {
+        this.pinnedIndices.add(pinnedItems.length);
+        pinnedItems.push(item);
+      } else {
+        regularItems.push(item);
+      }
+    }
+    this.allItems = [...pinnedItems, ...regularItems];
     if (this.allItems.length === 0) {
       container.createDiv({
         cls: "date-browser-empty",
         text: "No notes found"
       });
       return;
+    }
+    if (pinnedItems.length > 0) {
+      const pinnedArea = container.createDiv({ cls: "date-browser-pinned" });
+      for (let i = 0; i < pinnedItems.length; i++) {
+        pinnedArea.insertAdjacentHTML(
+          "beforeend",
+          this.renderItemHtml(pinnedItems[i], i)
+        );
+      }
+      this.populateIcons(pinnedArea);
+      container.createDiv({ cls: "date-browser-separator" });
+      pinnedArea.addEventListener(
+        "click",
+        (event) => this.handleItemClick(event)
+      );
+      pinnedArea.addEventListener(
+        "auxclick",
+        (event) => this.handleItemClick(event)
+      );
     }
     const scrollArea = container.createDiv({
       cls: "clusterize-scroll",
@@ -583,7 +628,9 @@ var DailyNotesView = class extends import_obsidian.ItemView {
       cls: "clusterize-content",
       attr: { id: "date-browser-content" }
     });
-    const rows = this.allItems.map((item, index) => this.renderItemHtml(item, index));
+    const rows = regularItems.map(
+      (item, i) => this.renderItemHtml(item, pinnedItems.length + i)
+    );
     this.clusterize = new import_clusterize.default({
       rows,
       scrollElem: scrollArea,
@@ -601,33 +648,41 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     });
     this.populateIcons(contentArea);
     this.updateActiveHighlight();
-    const handleClick = (event) => {
-      const target = event.target;
-      const row = target.closest(".nav-file-title");
-      if (!row)
-        return;
-      const indexStr = row.dataset.index;
-      if (indexStr === void 0)
-        return;
-      const index = parseInt(indexStr, 10);
-      const item = this.allItems[index];
-      if (!item)
-        return;
-      const newLeaf = import_obsidian.Keymap.isModEvent(event) || event.button === 1;
-      if (item.type === "heading") {
-        this.openHeading(item, newLeaf);
-      } else {
-        this.openFile(item.file, newLeaf);
-      }
-    };
-    contentArea.addEventListener("click", handleClick);
-    contentArea.addEventListener("auxclick", handleClick);
+    contentArea.addEventListener(
+      "click",
+      (event) => this.handleItemClick(event)
+    );
+    contentArea.addEventListener(
+      "auxclick",
+      (event) => this.handleItemClick(event)
+    );
+  }
+  handleItemClick(event) {
+    const target = event.target;
+    const row = target.closest(".nav-file-title");
+    if (!row)
+      return;
+    const indexStr = row.dataset.index;
+    if (indexStr === void 0)
+      return;
+    const index = parseInt(indexStr, 10);
+    const item = this.allItems[index];
+    if (!item)
+      return;
+    const newLeaf = import_obsidian.Keymap.isModEvent(event) || event.button === 1;
+    if (item.type === "heading") {
+      this.openHeading(item, newLeaf);
+    } else {
+      this.openFile(item.file, newLeaf);
+    }
   }
   renderItemHtml(item, index) {
     const iconName = item.type === "heading" ? "heading" : "file-text";
     const text = item.type === "note" ? item.file.basename : item.heading;
     const escapedText = this.escapeHtml(text);
-    return `<div class="tree-item nav-file">
+    const isPinned = this.pinnedIndices.has(index);
+    const pinnedClass = isPinned ? " is-pinned" : "";
+    return `<div class="tree-item nav-file${pinnedClass}">
       <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
         <span class="nav-file-icon" data-icon="${iconName}"></span>
         <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
@@ -640,7 +695,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     return div.innerHTML;
   }
   populateIcons(container) {
-    const iconElements = container.querySelectorAll(".nav-file-icon[data-icon]");
+    const iconElements = container.querySelectorAll("[data-icon]");
     iconElements.forEach((el) => {
       const iconName = el.getAttribute("data-icon");
       if (iconName && el.children.length === 0) {
