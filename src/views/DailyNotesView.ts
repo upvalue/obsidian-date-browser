@@ -267,7 +267,7 @@ export class DailyNotesView extends ItemView {
     return `<div class="tree-item nav-file${pinnedClass}">
       <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
         <span class="nav-file-icon" data-icon="${iconName}"></span>
-        <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
+        <span class="tree-item-inner nav-file-title-content" title="${escapedText}">${escapedText}</span>
       </div>
     </div>`;
   }

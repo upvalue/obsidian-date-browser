@@ -7,7 +7,14 @@ settings:
 importers:
 
   .:
+    dependencies:
+      clusterize.js:
+        specifier: ^1.0.0
+        version: 1.0.0
     devDependencies:
+      '@types/clusterize.js':
+        specifier: ^0.18.3
+        version: 0.18.3
       '@types/jest':
         specifier: ^29.5.12
         version: 29.5.14
@@ -455,6 +462,9 @@ packages:
   '@types/babel__traverse@7.28.0':
     resolution: {integrity: sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q==}
 
+  '@types/clusterize.js@0.18.3':
+    resolution: {integrity: sha512-udptC3aq8hfaXgmt9lC73OuE4RJYt26D2XIj+fTNDs0wuzAgQ6cyDpQOSkWhU65NroISAWhZ3/aovvV88IX7Gw==}
+
   '@types/codemirror@5.60.8':
     resolution: {integrity: sha512-VjFgDF/eB+Aklcy15TtOTLQeMjTo07k7KAjql8OK5Dirr7a6sJY4T1uVBDuTVG9VEmn1uUsohOpYnVfgC6/jyw==}
 
@@ -601,6 +611,9 @@ packages:
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
+
+  clusterize.js@1.0.0:
+    resolution: {integrity: sha512-EEYhO8rOvw9JVaHLgEFdvvg9H6ug/GVl8KgakOoc9hg4FK6xmyYsC4B0Aw/QI6ClPxaGPKBetO+ISvCY8N/uUQ==}
 
   co@4.6.0:
     resolution: {integrity: sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==}
@@ -1853,6 +1866,8 @@ snapshots:
     dependencies:
       '@babel/types': 7.28.5
 
+  '@types/clusterize.js@0.18.3': {}
+
   '@types/codemirror@5.60.8':
     dependencies:
       '@types/tern': 0.23.9
@@ -2025,6 +2040,8 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
+
+  clusterize.js@1.0.0: {}
 
   co@4.6.0: {}
 

@@ -29,9 +29,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// node_modules/clusterize.js/clusterize.js
+// node_modules/.pnpm/clusterize.js@1.0.0/node_modules/clusterize.js/clusterize.js
 var require_clusterize = __commonJS({
-  "node_modules/clusterize.js/clusterize.js"(exports, module2) {
+  "node_modules/.pnpm/clusterize.js@1.0.0/node_modules/clusterize.js/clusterize.js"(exports, module2) {
     (function(name, definition) {
       if (typeof module2 != "undefined")
         module2.exports = definition();
@@ -685,7 +685,7 @@ var DailyNotesView = class extends import_obsidian.ItemView {
     return `<div class="tree-item nav-file${pinnedClass}">
       <div class="tree-item-self nav-file-title is-clickable" data-index="${index}">
         <span class="nav-file-icon" data-icon="${iconName}"></span>
-        <span class="tree-item-inner nav-file-title-content">${escapedText}</span>
+        <span class="tree-item-inner nav-file-title-content" title="${escapedText}">${escapedText}</span>
       </div>
     </div>`;
   }
